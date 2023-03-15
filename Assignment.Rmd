@@ -1,0 +1,32 @@
+---
+title: "Analysis of a share market trader investment portfolio"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+
+-
+
+## Setting the research goal
+
+-
+
+## Data Retreival
+
+-
+
+## Data preparation
+
+-
+
+## Data modeling
+
+-
+
+## Model diagnostic
+
+-
