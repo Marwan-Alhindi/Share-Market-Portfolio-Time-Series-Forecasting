@@ -8,13 +8,52 @@ Student ID: 3969393
 
 Finished On: 22/03/2023
 
-## Libraries
+## Libraries and functions
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r echo=TRUE}
 library(TSA)
+
+# Plot and output all residual analysis
+residual_analysis = function(model) {
+  res.model = rstudent(model)
+  par(mfrow=c(2,2))
+  plot(y = res.model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
+  hist(res.model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
+  qqnorm(y=res.model, main = "QQ plot of standardised residuals.")
+  qqline(y=res.model, col = 2, lwd = 1, lty = 2)
+  shapiro.test(res.model)
+  acf(res.model, main = "ACF of standardized residuals.")
+  
+}
+
+# Plotting forecasting functions at the end of the document
+plotting_forecast = function(string) {
+  plot(ts(data_ts_freq_7), xlim = c(1,200), ylim = c(-100, 200), ylab = "y", xlab = 't', main
+= string)
+lines(ts(as.vector(forecasts[,1]), start = c(127,1)), col="red", type="l")
+lines(ts(as.vector(forecasts[,2]), start = c(127,1)), col="blue", type="l")
+lines(ts(as.vector(forecasts[,3]), start = c(127,1)), col="blue", type="l")
+legend("bottomleft", lty=1, pch=1, col=c("black","blue","red"), text.width = 18,
+c("Data","5% forecast limits", "Forecasts"))
+}
+
+# adding main title to residual plot
+adding_main_title = function(string) {
+  mtext(string,                   # Add main title
+      side = 4,
+      line = - 2,
+      outer = TRUE)
+}
+
+# Plotting the fitted model
+plotting_model = function(model,string) {
+  plot(ts(fitted(model)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = string, ylim = c(-70,170))
+  points(data_ts)
+  legend(1,95,legend=c("Original Data","Fitted Model"), col = c("black","red"), lty = 1:2, cex=0.8)
+}
 ```
 
 ## Defenitions and Essentials
@@ -66,7 +105,7 @@ library(TSA)
 
 ```{r}
 # reading data
-data = read.csv('C:/Users/User/Desktop/Assignment/assignment1Data2023.csv', header = TRUE)
+data = read.csv('C:/Users/User/Desktop/Time series - assignment 1/assignment1Data2023.csv', header = TRUE)
 # changing column names
 colnames(data) = c('day','investment')
 ```
@@ -101,7 +140,7 @@ plot(data_ts, type = 'o',ylab = 'y',xlab = 't', main = 'Figure 1. Time series pl
 1- Trend: There is an obvious downward trend as days increase, but at the end it seems like it will increase. Perhaps like a parabolic shape.
 
 2- Seasonality: The seasonality can be observed using ACF. The frequency is 7.
-![](C:/Users/User/Desktop/Assignment/87341.jpg)
+![](C:/Users/User/Desktop/Time series - assignment 1/87341.jpg)
 
 3- Changing Variance: There is an increase in variance around the mean as days increase.
 
@@ -109,7 +148,7 @@ plot(data_ts, type = 'o',ylab = 'y',xlab = 't', main = 'Figure 1. Time series pl
 
 5- Behavior: The series seems to have an auto regressive behavior. From the ACF, as lags increases, there are no significant drop. The effect of each point last longer.
 
-![](C:/Users/User/Desktop/Assignment/92273.jpg)
+![](C:/Users/User/Desktop/Time series - assignment 1/92273.jpg)
 
 ## Data modeling
 
@@ -130,9 +169,7 @@ linear_model = lm(data_ts~t)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(linear_model)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = 'Figure 2. Fitted linear model')
-points(data_ts)
-legend(1,95,legend=c("Original Data","Fitted Model"), col = c("black","red"), lty = 1:2, cex=0.8)
+plotting_model(linear_model,'Figure 2. Fitted linear model')
 ```
 
 - The linear model at least capture the trend.
@@ -156,18 +193,8 @@ summary(linear_model)
   
 ```{r}
 # Residuals analysis
-res.linear_model = rstudent(linear_model)
-par(mfrow=c(2,2))
-plot(y = res.linear_model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals from linear model.")
-hist(res.linear_model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.linear_model, main = "QQ plot of standardised residuals.")
-qqline(y=res.linear_model, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.linear_model)
-acf(res.linear_model, main = "ACF of standardized residuals.")
-mtext("Figure 3-6. Linear Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(linear_model)
+adding_main_title("Figure 3-6. Linear Residuals Analysis")
 ```
 
 - Standardized residuals from linear model: The residuals are capturing the trend, behavior,changing variance and seasonality. This means the linear model is bad because the residuals are not random.
@@ -192,14 +219,12 @@ parabolic_model = lm(data_ts~t2+t)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(parabolic_model)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = 'Figure 7. Fitted parabolic model')
-points(data_ts)
-legend(1,95,legend=c("Original Data","Fitted Model"), col = c("black","red"), lty = 1:2, cex=0.8)
+plotting_model(parabolic_model,'Figure 7. Fitted parabolic model')
 ```
 
 - There does not seem a significant difference visually from graph between linear and parabolic.
 
-```{r}
+```{r echo=FALSE}
 # Model analysis
 summary(parabolic_model)
 ```
@@ -211,18 +236,8 @@ summary(parabolic_model)
 
 ```{r echo=FALSE}
 # Residuals analysis
-res.parabolic_model = rstudent(parabolic_model)
-par(mfrow=c(2,2))
-plot(y = res.parabolic_model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals from parabolic model.")
-hist(res.parabolic_model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.parabolic_model, main = "QQ plot of standardised residuals.")
-qqline(y=res.parabolic_model, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.parabolic_model)
-acf(res.parabolic_model, main = "ACF of standardized residuals.")
-mtext("Figure 8-11. Parabolic Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(parabolic_model)
+adding_main_title("Figure 3-6. Linear Residuals Analysis")
 ```
 
 - As expected, no improvement in adding t2
@@ -240,6 +255,9 @@ $$
 # Assigning variable and building model
 t10 = t^10
 poly_10 = lm(data_ts~t10+t)
+```
+
+```{r echo=FALSE}
 # Model analysis
 summary(poly_10)
 ```
@@ -249,27 +267,15 @@ summary(poly_10)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(poly_10)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = 'Figure 12. Fitted High polynomial')
-points(data_ts)
-legend(1,95,legend=c("Original Data","Fitted Model"), col = c("black","red"), lty = 1:2, cex=0.8)
+plotting_model(poly_10,'Figure 12. Fitted High polynomial')
 ```
 
 - The interesting thing is that it captures the end behavior by shifting upwards?
 
 ```{r echo=FALSE}
 # Residual analysis
-res.poly_10 = rstudent(poly_10)
-par(mfrow=c(2,2))
-plot(y = res.poly_10, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
-hist(res.poly_10,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.poly_10, main = "QQ plot of standardised residuals.")
-qqline(y=res.poly_10, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.poly_10)
-acf(res.poly_10, main = "ACF of standardized residuals.")
-mtext("Figure 13-15. High polynomial Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(poly_10)
+adding_main_title("Figure 13-15. High polynomial Residuals Analysis")
 ```
 
 - Normality decreased and the model is not better.
@@ -287,10 +293,9 @@ seasonal_model = lm(data_ts_freq_7~seasons.-1)
 
 ```{r echo=FALSE}
 #Plotting
-plot(ts(fitted(seasonal_model)), col = "red", lty = 2, ylab = 'y',xlab = 't', main = 'Figure.16 Fitted seaonal model')
-points(data_ts)
+plotting_model(seasonal_model,'Figure.16 Fitted seaonal model')
 ```
-```{r}
+```{r echo=FALSE}
 # Model Analysis
 summary(seasonal_model)
 ```
@@ -301,18 +306,8 @@ summary(seasonal_model)
 
 ```{r echo=FALSE}
 # Residuals analysis
-res.seasonal_model = rstudent(seasonal_model)
-par(mfrow=c(2,2))
-plot(y = res.seasonal_model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
-hist(res.seasonal_model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.seasonal_model, main = "QQ plot of standardised residuals.")
-qqline(y=res.seasonal_model, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.seasonal_model)
-acf(res.seasonal_model, main = "ACF of standardized residuals.")
-mtext("Figure 17-20. High polynomial Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(seasonal_model)
+adding_main_title("Figure 17-20. High polynomial Residuals Analysis")
 ```
 
 - The model does not capture autocorrelation and residuals are not normal at all from the test and graphs.
@@ -331,13 +326,12 @@ seasonal_linear_model = lm(data_ts_freq_7~seasons_linear.+t-1)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(seasonal_linear_model)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = 'Figure.21 Fitted seasonal model')
-points(data_ts)
+plotting_model(seasonal_linear_model,'Figure.21 Fitted seasonal model')
 ```
 
 - Captured the trend and seasonality.
 
-```{r}
+```{r echo=FALSE}
 # Model analysis
 summary(seasonal_linear_model)
 ```
@@ -350,18 +344,8 @@ summary(seasonal_linear_model)
 
 ```{r echo=FALSE}
 # Residuals analysis
-res.seasonal_linear_model = rstudent(seasonal_linear_model)
-par(mfrow=c(2,2))
-plot(y = res.seasonal_linear_model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
-hist(res.seasonal_linear_model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.seasonal_linear_model, main = "QQ plot of standardised residuals.")
-qqline(y=res.seasonal_linear_model, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.seasonal_linear_model)
-acf(res.seasonal_linear_model, main = "ACF of standardized residuals.")
-mtext("Figure 22-25. Seasonal Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(seasonal_linear_model)
+adding_main_title("Figure 22-25. Seasonal Residuals Analysis")
 ```
 
 - As expected, the model is capturing better trend and overall behavior of dataset. Therefore, residuals started to behave like white noise.
@@ -380,10 +364,9 @@ cosine_lin = lm(data_ts_freq_7~harmonic.+t)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(cosine_lin)), col = "red", lty = 2, ylab = 'y', xlab = 't',main = 'Figure 26. Fitted cosine + linear model')
-points(data_ts)
+plotting_model(cosine_lin,'Figure 26. Fitted cosine + linear model')
 ```
-```{r}
+```{r echo=FALSE}
 # Model analysis
 summary(cosine_lin)
 ```
@@ -395,18 +378,8 @@ summary(cosine_lin)
 
 ```{r echo=FALSE}
 # Residual analysis
-res.cosine_lin = rstudent(cosine_lin)
-par(mfrow=c(2,2))
-plot(y = res.cosine_lin, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
-hist(res.cosine_lin,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.cosine_lin, main = "QQ plot of standardised residuals.")
-qqline(y=res.cosine_lin, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.cosine_lin)
-acf(res.cosine_lin, main = "ACF of standardized residuals.")
-mtext("Figure 27-30. Cosine + linear Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(cosine_lin)
+adding_main_title("Figure 27-30. Cosine + linear Residuals Analysis")
 ```
 
 - The white noise behavior became more obvious!
@@ -424,13 +397,12 @@ cosine_lin_1 = lm(data_ts_freq_7~cosine_term+t)
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(cosine_lin_1)), col = "red", lty = 2, ylab = 'y', xlab = 'x',main = 'Figure 31. Fitted Cosine term + linear without sin term')
-points(data_ts)
+plotting_model(cosine_lin_1,'Figure 31. Fitted Cosine term + linear without sin term')
 ```
 
 - Does not seems there is a change in plot but let us analyse the summary and residuals.
 
-```{r}
+```{r echo=FALSE}
 # Model analysis
 summary(cosine_lin_1)
 ```
@@ -440,18 +412,8 @@ summary(cosine_lin_1)
 
 ```{r echo=FALSE}
 # Residuals analysis
-res.cosine_lin_1 = rstudent(cosine_lin_1)
-par(mfrow=c(2,2))
-plot(y = res.cosine_lin_1, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals from no sin + t model.")
-hist(res.cosine_lin_1,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.cosine_lin_1, main = "QQ plot of standardised residuals.")
-qqline(y=res.cosine_lin_1, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.cosine_lin_1)
-acf(res.cosine_lin_1, main = "ACF of standardized residuals.")
-mtext("Figure 32-35. cosine + t without sin Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(cosine_lin_1)
+adding_main_title("Figure 32-35. cosine + t without sin Residuals Analysis")
 ```
 
 - The p-value decreased in Shapiro wilk by inconsiderable amount. From principle of parsimony, this is better.
@@ -467,10 +429,9 @@ cosine_lin_sqrt = lm(data_ts_freq_7~((cosine_term+t)*tsqrt))
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(fitted(cosine_lin_sqrt)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = '(Figure 36. Cosine term + linear) * sqrt(t)')
-points(data_ts)
+plotting_model(cosine_lin_sqrt,'Figure 36. (Cosine term + linear) * sqrt(t)')
 ```
-```{r}
+```{r echo=FALSE}
 # Model analysis
 summary(cosine_lin_sqrt)
 ```
@@ -482,18 +443,8 @@ summary(cosine_lin_sqrt)
 
 ```{r echo=FALSE}
 # Residuals analysis
-res.cosine_lin_sqrt = rstudent(cosine_lin_sqrt)
-par(mfrow=c(2,2))
-plot(y = res.cosine_lin_sqrt, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
-hist(res.cosine_lin_sqrt,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
-qqnorm(y=res.cosine_lin_sqrt, main = "QQ plot of standardised residuals.")
-qqline(y=res.cosine_lin_sqrt, col = 2, lwd = 1, lty = 2)
-shapiro.test(res.cosine_lin_sqrt)
-acf(res.cosine_lin_sqrt, main = "ACF of standardized residuals.")
-mtext("Figure 37-40. (cosine + t) * sqrt(t) Residuals Analysis",                   # Add main title
-      side = 4,
-      line = - 2,
-      outer = TRUE)
+residual_analysis(cosine_lin_sqrt)
+adding_main_title("Figure 37-40. (cosine + t) * sqrt(t) Residuals Analysis")
 ```
 
 - Residuals seems to be fully white noise.
@@ -527,15 +478,9 @@ forecasts
 - The predictions seems to increase to + infinity and that does not capture the cyclic behavior.
 - The resulted values were huge and must divided by 10000. The reason behind this is unknown.
 
-```{r}
+```{r echo=TRUE}
 # Plotting
-plot(ts(data_ts_freq_7), xlim = c(1,130), ylim = c(-50, 160), ylab = "y", xlab = 't', main
-= "Figure 41. Forecasting return trading using (cosine_term + t) * tsqrt")
-lines(ts(as.vector(forecasts[,1]), start = c(127,1), frequency = 7), col="red", type="l")
-lines(ts(as.vector(forecasts[,2]), start = c(127,1), frequency = 7), col="blue", type="l")
-lines(ts(as.vector(forecasts[,3]), start = c(127,1), frequency = 7), col="blue", type="l")
-legend("bottomleft", lty=1, pch=1, col=c("black","blue","red"), text.width = 18,
-c("Data","5% forecast limits", "Forecasts"))
+plotting_forecast("Figure 41. Forecasting return trading using (cosine_term + t) * tsqrt")
 ```
 
 ## Predictions of two other models that are not chosen
@@ -553,13 +498,7 @@ forecasts
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(data_ts_freq_7), xlim = c(1,130), ylim = c(-50, 160), ylab = "y", xlab = 't', main
-= "Figure 42. Forecasting return trading using  cosine_term + t")
-lines(ts(as.vector(forecasts[,1]), start = c(127,1), frequency = 7), col="red", type="l")
-lines(ts(as.vector(forecasts[,2]), start = c(127,1), frequency = 7), col="blue", type="l")
-lines(ts(as.vector(forecasts[,3]), start = c(127,1), frequency = 7), col="blue", type="l")
-legend("bottomleft", lty=1, pch=1, col=c("black","blue","red"), text.width = 18,
-c("Data","5% forecast limits", "Forecasts"))
+plotting_forecast("Figure 42. Forecasting return trading using  cosine_term + t")
 ```
 
 ### lm(formula = data_ts ~ t10 + t)
@@ -576,13 +515,7 @@ forecasts
 
 ```{r echo=FALSE}
 # Plotting
-plot(ts(data_ts_freq_7), xlim = c(1,200), ylim = c(-100, 200), ylab = "y", xlab = 't', main
-= "Figure 43. Forecasting return trading using t10 + t investment")
-lines(ts(as.vector(forecasts[,1]), start = c(127,1)), col="red", type="l")
-lines(ts(as.vector(forecasts[,2]), start = c(127,1)), col="blue", type="l")
-lines(ts(as.vector(forecasts[,3]), start = c(127,1)), col="blue", type="l")
-legend("bottomleft", lty=1, pch=1, col=c("black","blue","red"), text.width = 18,
-c("Data","5% forecast limits", "Forecasts"))
+plotting_forecast("Figure 43. Forecasting return trading using t10 + t investment")
 ```
 
 ## References
