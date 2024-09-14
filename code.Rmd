@@ -1,0 +1,522 @@
+---
+title: "Analysis of a Share Market Trader Investment Portfolio"
+output: html_document
+---
+Author Name: Mrwan Alhandi
+
+Finished On: 22/03/2023
+
+## Libraries and functions
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE}
+library(TSA)
+
+# Plot and output all residual analysis
+residual_analysis = function(model) {
+  res.model = rstudent(model)
+  par(mfrow=c(2,2))
+  plot(y = res.model, x = as.vector(time(data_ts)),xlab = 'Time', ylab='Standardized Residuals',type='l',main = "Standardised residuals.")
+  hist(res.model,xlab='Standardized Residuals', main = "Histogram of standardised residuals.")
+  qqnorm(y=res.model, main = "QQ plot of standardised residuals.")
+  qqline(y=res.model, col = 2, lwd = 1, lty = 2)
+  shapiro.test(res.model)
+  acf(res.model, main = "ACF of standardized residuals.")
+  
+}
+
+# Plotting forecasting functions at the end of the document
+plotting_forecast = function(string) {
+  plot(ts(data_ts_freq_7), xlim = c(1,200), ylim = c(-100, 200), ylab = "y", xlab = 't', main
+= string)
+lines(ts(as.vector(forecasts[,1]), start = c(127,1)), col="red", type="l")
+lines(ts(as.vector(forecasts[,2]), start = c(127,1)), col="blue", type="l")
+lines(ts(as.vector(forecasts[,3]), start = c(127,1)), col="blue", type="l")
+legend("bottomleft", lty=1, pch=1, col=c("black","blue","red"), text.width = 18,
+c("Data","5% forecast limits", "Forecasts"))
+}
+
+# adding main title to residual plot
+adding_main_title = function(string) {
+  mtext(string,                   # Add main title
+      side = 4,
+      line = - 2,
+      outer = TRUE)
+}
+
+# Plotting the fitted model
+plotting_model = function(model,string) {
+  plot(ts(fitted(model)), col = "red", lty = 2, ylab = 'y', xlab = 't', main = string, ylim = c(-70,170))
+  points(data_ts)
+  legend(1,95,legend=c("Original Data","Fitted Model"), col = c("black","red"), lty = 1:2, cex=0.8)
+}
+```
+
+## Defenitions and Essentials
+  
+  In time series, we build a model based on only time. Whereas In other machine learning models, we have many features/independent variables and by using some optimization algorithms such as gradient descent, its possible to find the best parameters for each feature. 
+  
+  A stochastic process is a collection of random variables where each random variable has a probability of occurrence. There is discrete and continuous stochastic processes. If the time variable can only include integers, then its discrete. If it can include decimals, then its continuous. Stochastic processes such as random walk, white noise, random cosine wave and moving average can be discrete.
+  
+  One of the most important concepts about any time series is stationary. Stationary is that the probability laws that govern the behavior of the process do not change over time. In simple words, the distribution of certain windows of time in the data only depend on that window of time and not in the location of time. If a time series process is stationary, then this allows us to make statistical inferences about its structure.
+  
+  There are five key ideas when analyzing a time series:
+  
+    1- Trend: Does the dependent variable tend to increase or decrease as time increase?
+    
+    2- Seasonality: Is there a repeating patterns for the dependent variable as time increase with specific amount?
+    
+    3- Changing Variance: Are there change in fluctuations as time increase?
+    
+    4- Behavior: Does the data follow a specific process? such as auto regressive, white noise, moving average or random walk?
+    
+    5- Changing point: Is there a jump up or down in the dependent variable?
+  
+## Goal and Methodology
+
+  In this report, a deterministic trend approach to capture the trend of the analysis of a share market trader investment portfolio data and fit an appropriate model to be able to forecast. The deterministic approach cannot capture the randomness of data nor the autocorrelation because this is a consequence of having a stochastic trend in the data. To explain this further, let us understand equation (1):
+  
+  $$
+  \tag{1}
+    Y_t = \mu_t+ X_t
+  $$
+  
+  Where:
+  
+  Y_t is the dependent variable at time t. (Information in the data)
+  
+  u_t is the deterministic trend or the mean function at time t. (Information captured by the model)
+  
+  X_t is the randomness or residuals at time t. (Information not captured by the model + uncontrollable randomness)
+  
+  The goal is that the mean function capture all the five key ideas (if exists in the series) and to not leave it to the residuals without over fitting or under fitting. If The residuals contains trend, seasonality, changing variance, behavior or changing point, then the mean function does not represent the data well. If any assumptions is made, then this can be disregarded.
+  
+  Randomness cannot be identified and so we approximate it by manipulating the previous equation:
+  $$
+  \tag{2}
+    X_t = Y_t - \mu_t
+  $$
+
+## Data Retreival
+
+```{r}
+# reading data
+data = read.csv('C:/Users/User/Desktop/Time series - assignment 1/assignment1Data2023.csv', header = TRUE)
+# changing column names
+colnames(data) = c('day','investment')
+```
+
+```{r}
+# start of the data
+head(data)
+# end of the data
+tail(data)
+# statistical summary
+summary(data)
+```
+
+## Data preparation
+
+In time series, outliers can describe jumps and other interesting characteristic of the series behavior. Outliers should not be removed from a time series.
+
+```{r}
+# Any missing values?
+sum(is.na(data))
+# Converting data to a time series object
+data_ts = ts(data[,2])
+```
+
+## Data exploration
+
+```{r}
+# Plotting
+plot(data_ts, type = 'o',ylab = 'y',xlab = 't', main = 'Figure 1. Time series plot of daily share market investment')
+```
+
+1- Trend: There is an obvious downward trend as days increase, but at the end it seems like it will increase. Perhaps like a parabolic shape.
+
+2- Seasonality: The seasonality can be observed using ACF. The frequency is 7.
+![](C:/Users/User/Desktop/Time series - assignment 1/87341.jpg)
+
+3- Changing Variance: There is an increase in variance around the mean as days increase.
+
+4- Changing point: There is no changing point.
+
+5- Behavior: The series seems to have an auto regressive behavior. From the ACF, as lags increases, there are no significant drop. The effect of each point last longer.
+
+![](C:/Users/User/Desktop/Time series - assignment 1/92273.jpg)
+
+## Data modeling
+
+### Linear model
+
+The equation (3) represents a linear model:
+
+$$
+\tag{3}
+  \mu_t = \beta_0+\beta_1t
+$$
+
+```{r}
+# Accessing time variable and building the linear model
+t = time(data_ts)
+linear_model = lm(data_ts~t)
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(linear_model,'Figure 2. Fitted linear model')
+```
+
+- The linear model at least capture the trend.
+
+```{r}
+# Model analysis
+summary(linear_model)
+```
+
+- Median of residuals is not around 0. The range of residuals is around 110.
+- We do not reject the hypothesis of coefficients.
+- Adjusted R-squared is between 0.8 and 0.9.
+- Std error is low and estimate is good. t is significant.
+- Overall fit is significant.
+- Even though all the statistics show that it is a good model, let us see analyse the error as seen in equation (4) and see if this is the case.
+
+  $$
+  \tag{4}
+    X_t = Y_t - (\beta_0+\beta_1t)
+  $$
+  
+```{r}
+# Residuals analysis
+residual_analysis(linear_model)
+adding_main_title("Figure 3-6. Linear Residuals Analysis")
+```
+
+- Standardized residuals from linear model: The residuals are capturing the trend, behavior,changing variance and seasonality. This means the linear model is bad because the residuals are not random.
+- Histogram of standardized residuals: right-skewed distribution which does not indicate normality. 
+- QQ plot of standardized residuals: Some points at the two ends are not close to the line.
+- ACF of standardized residuals: Some lines are crossing the confidence interval. This means that the model is not capturing the autocorrelation.
+- Sharpiro wilk: p-value < 0.05 which indicates that residuals distribution is not random/normal.
+
+A parabolic model might do better, since there seems to be a downward then upward shape? Equation (5) can describe a parabolic shape.
+
+### Parabolic model
+$$
+\tag{5}
+  \mu_t = \beta_0+\beta_1t+\beta_2t^2
+$$
+
+```{r warning=FALSE}
+# Assigning variables and building the linear model
+t2 = t^2
+parabolic_model = lm(data_ts~t2+t)
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(parabolic_model,'Figure 7. Fitted parabolic model')
+```
+
+- There does not seem a significant difference visually from graph between linear and parabolic.
+
+```{r echo=FALSE}
+# Model analysis
+summary(parabolic_model)
+```
+
+- Median is better than linear since it is closer to 0. Slight improvement in the range of residuals.
+- t2 is insignificant and it estimate is low.
+- No improvement in R-squared.
+- t2 seems to have no improvement, but let us check the residuals analysis to confirm:
+
+```{r echo=FALSE}
+# Residuals analysis
+residual_analysis(parabolic_model)
+adding_main_title("Figure 3-6. Linear Residuals Analysis")
+```
+
+- As expected, no improvement in adding t2
+
+But, what happens as the power increases? Equation (6) can describe this.
+
+### High Polynomial fit
+
+$$
+\tag{6}
+  \mu_t = \beta_0+\beta_1t+\beta_2t^\inf
+$$
+
+```{r}
+# Assigning variable and building model
+t10 = t^10
+poly_10 = lm(data_ts~t10+t)
+```
+
+```{r echo=FALSE}
+# Model analysis
+summary(poly_10)
+```
+
+- Median of residuals became slightly worse and the range of them is approximately the same.
+- t10 is insignificant and it is estimate is very low.
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(poly_10,'Figure 12. Fitted High polynomial')
+```
+
+- The interesting thing is that it captures the end behavior by shifting upwards?
+
+```{r echo=FALSE}
+# Residual analysis
+residual_analysis(poly_10)
+adding_main_title("Figure 13-15. High polynomial Residuals Analysis")
+```
+
+- Normality decreased and the model is not better.
+
+Let us now capture the seasonality and see how a seasonal model do:
+
+### Seasonal model - Frequency = 7
+
+```{r}
+# Assigning variables and building model
+data_ts_freq_7 = ts(data[,2], frequency = 7)
+seasons.= season(data_ts_freq_7)
+seasonal_model = lm(data_ts_freq_7~seasons.-1)
+```
+
+```{r echo=FALSE}
+#Plotting
+plotting_model(seasonal_model,'Figure.16 Fitted seaonal model')
+```
+```{r echo=FALSE}
+# Model Analysis
+summary(seasonal_model)
+```
+
+- Median and the range of residuals are worse.
+- Coefficients seems to be significant
+- Adjusted R-squared way lower.
+
+```{r echo=FALSE}
+# Residuals analysis
+residual_analysis(seasonal_model)
+adding_main_title("Figure 17-20. High polynomial Residuals Analysis")
+```
+
+- The model does not capture autocorrelation and residuals are not normal at all from the test and graphs.
+- The only good thing about this model is that it is capturing some of the seasonality/frequencies and residuals are started to become white noise.
+
+What if we combine linear t term and seasonal to capture the downward trend?
+
+### Linear + Seasonal
+
+```{r}
+# Assigning variables and building model
+t = time(data_ts_freq_7)
+seasons_linear.= season(data_ts_freq_7)
+seasonal_linear_model = lm(data_ts_freq_7~seasons_linear.+t-1)
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(seasonal_linear_model,'Figure.21 Fitted seasonal model')
+```
+
+- Captured the trend and seasonality.
+
+```{r echo=FALSE}
+# Model analysis
+summary(seasonal_linear_model)
+```
+
+- Median and range of residuals better than seasonal but still not good.
+- All coefficients estimate are good and they are significant.
+- Std Error are low which is good.
+- High adjusted R-squared. Is the model overfitting? Let us analyse the residuals:
+
+
+```{r echo=FALSE}
+# Residuals analysis
+residual_analysis(seasonal_linear_model)
+adding_main_title("Figure 22-25. Seasonal Residuals Analysis")
+```
+
+- As expected, the model is capturing better trend and overall behavior of dataset. Therefore, residuals started to behave like white noise.
+- Histogram shows normality.
+- Most of points are on the line in the QQ plot which indicate normality.
+- Shapiro wilk test p value is very close to 0.05.
+
+Will a cosine model + linear model residuals do better in capturing normality and less autocorrelation?
+
+### Cosine + linear model
+```{r}
+# Assigning variables and building model
+harmonic. = harmonic(data_ts_freq_7,1)
+cosine_lin = lm(data_ts_freq_7~harmonic.+t)
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(cosine_lin,'Figure 26. Fitted cosine + linear model')
+```
+```{r echo=FALSE}
+# Model analysis
+summary(cosine_lin)
+```
+
+- Median is close to 0 but the range still not that good.
+- Coefficients are all significant except the sin term.
+- Std error are all small.
+- VERY small change in R squared.
+
+```{r echo=FALSE}
+# Residual analysis
+residual_analysis(cosine_lin)
+adding_main_title("Figure 27-30. Cosine + linear Residuals Analysis")
+```
+
+- The white noise behavior became more obvious!
+- Shapiro wilk p-value of cosine + linear model > season + linear model. Even in plots, cosine + linear residuals seems to have more normality.
+
+Since the sin term was insignificant, does removing it will improve overall model or decrease residuals AC?
+
+### Removed sin term + linear
+
+```{r}
+# Assigning variables and building model
+cosine_term = harmonic.[,'cos(2*pi*t)']
+cosine_lin_1 = lm(data_ts_freq_7~cosine_term+t)
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(cosine_lin_1,'Figure 31. Fitted Cosine term + linear without sin term')
+```
+
+- Does not seems there is a change in plot but let us analyse the summary and residuals.
+
+```{r echo=FALSE}
+# Model analysis
+summary(cosine_lin_1)
+```
+
+- No improvement in residuals median and range.
+- R-squared improved by VERY unnoticeable amount.
+
+```{r echo=FALSE}
+# Residuals analysis
+residual_analysis(cosine_lin_1)
+adding_main_title("Figure 32-35. cosine + t without sin Residuals Analysis")
+```
+
+- The p-value decreased in Shapiro wilk by inconsiderable amount. From principle of parsimony, this is better.
+- The model is not capturing the start behavior. What if we multiplied cos amplitude by sqrt(t)?
+
+### ( Cos + t ) * sqrt(t)
+
+```{r}
+# Assigning variables and building model
+tsqrt = sqrt(t)
+cosine_lin_sqrt = lm(data_ts_freq_7~((cosine_term+t)*tsqrt))
+```
+
+```{r echo=FALSE}
+# Plotting
+plotting_model(cosine_lin_sqrt,'Figure 36. (Cosine term + linear) * sqrt(t)')
+```
+```{r echo=FALSE}
+# Model analysis
+summary(cosine_lin_sqrt)
+```
+
+
+- Median very close to 0 and the range is way smaller!
+- All coefficients are significant and their std error is low.
+- Very high R which might tell us that the model is overfitting. But let us analyse the residuals:
+
+```{r echo=FALSE}
+# Residuals analysis
+residual_analysis(cosine_lin_sqrt)
+adding_main_title("Figure 37-40. (cosine + t) * sqrt(t) Residuals Analysis")
+```
+
+- Residuals seems to be fully white noise.
+- Histogram and QQ plot indicate normality but Shapiro wilk p value is low.
+- ACF of residuals does not indicate auto regressive which means the model is capturing most of AF.
+
+## Conclusion and predictions
+
+- There are two models that are good in terms of residuals analysis which are lm(formula = data_ts_freq_7 ~ ((cosine_term + t) * tsqrt)) and lm(formula = data_ts_freq_7 ~ cosine_term + t) but these seems to over fit the data and might just copy the behavior.
+- The other models does not over fit but most of the analysis such as trend, seasonality and ACF are captured in residuals.
+
+## Predictions of chosen model
+
+### lm(formula = data_ts_freq_7 ~ ((cosine_term + t) * tsqrt))
+
+- This is the chosen model because of the followings:
+  - Cosine_term captures the seasonality of the data.
+  - t term captures the negative trend.
+  - By multiplying with tsqrt, the model captures the change in variance or the change of waves as time increases.
+  - The model analysis shows a good range in residual and R squared values.
+  - The residuals analysis shows that the residuals are white noise. The normality is there by using all relevant testing.
+  
+```{r}
+# Predicting
+h = 15
+new = data.frame(t = seq((length(t)+1), (length(t)+h), 1), cosine_term = seq((length(cosine_term)+1), (length(cosine_term)+h), 1), tsqrt = seq((length(tsqrt)+1), (length(tsqrt)+h), 1))
+forecasts = predict(cosine_lin_sqrt, new, interval = "prediction")/10000
+forecasts
+```
+
+- The predictions seems to increase to + infinity and that does not capture the cyclic behavior.
+- The resulted values were huge and must divided by 10000. The reason behind this is unknown.
+
+```{r echo=TRUE}
+# Plotting
+plotting_forecast("Figure 41. Forecasting return trading using (cosine_term + t) * tsqrt")
+```
+
+## Predictions of two other models that are not chosen
+
+### lm(formula = data_ts_freq_7 ~ cosine_term + t)
+```{r echo=FALSE}
+# Predicting
+h = 15
+new = data.frame(t = seq((length(t)+1), (length(t)+h), 1), cosine_term = seq((length(cosine_term)+1), (length(cosine_term)+h), 1))
+forecasts = predict(cosine_lin_1, new, interval = "prediction")/100
+forecasts
+```
+
+- The same issues of previous model predictions are represented here.
+
+```{r echo=FALSE}
+# Plotting
+plotting_forecast("Figure 42. Forecasting return trading using  cosine_term + t")
+```
+
+### lm(formula = data_ts ~ t10 + t)
+
+```{r echo=FALSE}
+# Predicting
+h = 15
+new = data.frame(t = seq((length(t)+1), (length(t)+h), 1), t10 = seq((length(t10)+1), (length(t10)+h), 1))
+forecasts = predict(poly_10, new, interval = "prediction")
+forecasts
+```
+
+- Same issues. The model is approaching - infinity.
+
+```{r echo=FALSE}
+# Plotting
+plotting_forecast("Figure 43. Forecasting return trading using t10 + t investment")
+```
+
+## References
+
+- MATH1318 Time Series Analysis notes prepared by Dr. Haydar Demirhan.
+- Time Series Analysis with application in R by Cryer and Chan.
