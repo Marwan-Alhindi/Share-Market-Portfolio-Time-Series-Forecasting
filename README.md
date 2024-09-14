@@ -1,5 +1,11 @@
 # Share Market Investment Portfolio Time Series Analysis
 
+## Languages and Tools
+
+- **R**: Used for the core time series analysis and data manipulation.
+- **TSA package**: For advanced time series models.
+- **Markdown**: For writing the report and documentation.
+
 ## Overview
 
 This repository contains the analysis of a share market trader's investment portfolio using time series analysis. The project focuses on building predictive models to forecast future market trends based on historical investment data. The analysis includes various time series models to capture trends, seasonality, autocorrelation, and other behaviors in the data.
